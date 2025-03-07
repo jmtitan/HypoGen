@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass, field
+import pprint
 
 import datasets
 import torch
@@ -25,8 +26,10 @@ from transformers import set_seed
 from transformers.trainer_utils import get_last_checkpoint
 
 from open_r1.configs import GRPOConfig
-from open_r1.rewards import (
-    accuracy_reward,
+#from open_r1.rewards import (
+from open_r1.tinyzero_rewards import (
+    #accuracy_reward,
+    evaluate_reward,
     code_reward,
     format_reward,
     get_code_format_reward,
@@ -43,6 +46,15 @@ from trl import GRPOTrainer, ModelConfig, ScriptArguments, TrlParser, get_peft_c
 
 
 logger = logging.getLogger(__name__)
+
+"""
+Call:
+# Repeat all input columns (but "prompt" and "completion") to match the number of generations
+keys = [key for key in inputs[0] if key not in ["prompt", "completion"]]
+reward_kwargs = {key: [example[key] for example in inputs] for key in keys}
+output_reward_func = reward_func(prompts=prompts, completions=completions, **reward_kwargs)
+rewards_per_func[:, i] = torch.tensor(output_reward_func, dtype=torch.float32, device=device)
+"""
 
 
 @dataclass
@@ -158,7 +170,8 @@ def main(script_args, training_args, model_args):
 
     # Get reward functions
     REWARD_FUNCS_REGISTRY = {
-        "accuracy": accuracy_reward,
+        #"accuracy": accuracy_reward,
+        "eqn_eval": evaluate_reward,
         "format": format_reward,
         "reasoning_steps": reasoning_steps_reward,
         "cosine": get_cosine_scaled_reward(
@@ -180,13 +193,16 @@ def main(script_args, training_args, model_args):
     reward_funcs = [REWARD_FUNCS_REGISTRY[func] for func in script_args.reward_funcs]
 
     # Format into conversation
+    # Need to modify this to suit each dataset
     def make_conversation(example):
         prompt = []
 
         if training_args.system_prompt is not None:
             prompt.append({"role": "system", "content": training_args.system_prompt})
 
-        prompt.append({"role": "user", "content": example["problem"]})
+        #prompt.append({"role": "user", "content": example["problem"]})
+        prompt.append({"role": "user", "content": f"Using the numbers {example['nums']}, create an equation that equals {example['target']}. You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags, for example <answer> (1 + 2) / 3 </answer>."
+                       })
         return {"prompt": prompt}
 
     dataset = dataset.map(make_conversation)
@@ -277,4 +293,7 @@ def main(script_args, training_args, model_args):
 if __name__ == "__main__":
     parser = TrlParser((GRPOScriptArguments, GRPOConfig, ModelConfig))
     script_args, training_args, model_args = parser.parse_args_and_config()
+    pprint.pprint(script_args)
+    pprint.pprint(training_args)
+    pprint.pprint(model_args)
     main(script_args, training_args, model_args)

@@ -2,6 +2,18 @@
 
 *A fully open reproduction of DeepSeek-R1. This repo is a work in progress, let's build it together!*
 
+Tony's note:
+
+Please follow the install instruction, let me know if you run into any issue. I encounter some uninstall package (distilabel?) but I solve it by uv pip install ...
+
+To run the tinyzero:
+```
+accelerate launch --num_processes=1 src/open_r1/grpo.py --config recipes/tinyzero/config_demo.yaml
+```
+Please note I am using the default accelerate config here and I set num_gpu=2, according to their implementation of grop, they reseave 1 gpu ... check below.
+
+It is at early stage but it works.
+
 **Table of Contents**  
 1. [Overview](#overview)  
 2. [Plan of attack](#plan-of-attack)  

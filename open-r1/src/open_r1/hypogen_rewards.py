@@ -4,41 +4,86 @@ import json
 import math
 import re
 from typing import Dict
-
 from latex2sympy2_extended import NormalizationConfig
 from math_verify import LatexExtractionConfig, parse, verify
-
+import random
 from .utils import is_e2b_available
 
-
+from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# load tool models
+emb_model = SentenceTransformer('all-MiniLM-L6-v2')
+infer_model = pipeline("text-generation", model="Qwen/Qwen2.5-3B-Instruct")
+with open('recipes/hypoGen/hypothesis_infer.md', 'r') as f:
+    infer_prompt = f.read()
 
-with open('open-r1/recipes/hypoGen/hypothesis_bank.json', 'r') as f:
+
+
+# load and embeding hypothesis bank
+with open('recipes/hypoGen/hypothesis_bank.json', 'r') as f:
     hb = json.load(f)
 hypothesis_bank = hb['hypothesis']
-emb_hyp_bank = model.encode(hypothesis_bank, convert_to_tensor=True)
+emb_hyp_bank = emb_model.encode(hypothesis_bank, convert_to_tensor=True)
+
+# load dataset
+with open('../data/retweet/retweet_ood.json', 'r') as f:
+    tweet_pairs_dataset = json.load(f)
+tweet_pairs_dataset['input'] = [(first, second) for first, second in zip(tweet_pairs_dataset['first_tweet'], tweet_pairs_dataset['second_tweet'])]
 
 
 
-def practical_rewards(completions, label, **kwargs):
+def get_hypothesis_pred(output):
+    match = re.search(r"Final answer: the (first|second) tweet", text)
+    if match:
+        result = match.group(1)
+        return result
+    else:
+        return None
+
+def get_hypothesis(output):
+    match = re.search(r'HYP:\s*(.*?[\.\!\?])', text)
+    if match:
+        result = match.group(1)
+    else:
+        return None
+
+def compute_score(preds, labels):
+    correct = sum([t == p for t, p in zip(labels, preds)])
+    score = correct / len(labels)
+    return score
+
+def practical_rewards(completions, **kwargs):
     contents = [completion[0]["content"] for completion in completions]
+    new_hypothesis_list = [get_hypothesis(output) for output in contents]
+
+    # random sample
+    indices = random.sample(range(len(tweet_pairs_dataset['input'])), 10)
+    llm_input = [tweet_pairs_dataset['input'][i] for i in indices]
+    labels = [tweet_pairs_dataset['label'][i] for i in indices]
+
+    infer_template = infer_template.format(input=llm_input)
+
+  
     rewards = []
-    for text, la in zip(contents, label):
-        match = re.search(r'Final answer:\s*(first|second)', text, re.IGNORECASE)
-        if match:
-            if match.group(1).lower() == 'first':
-                pred = 1
-            else:
-                pred = 2
-            
-            rewards.append(int(pred == la))
-        else:
+    for hyp, la in zip(new_hypothesis_list, label):
+        if not hyp:
             rewards.append(0)
+
+        else:
+            infer_template.format(hypothesis=hyp)
+            output = infer_model(infer_template, 
+                                max_new_tokens=100, 
+                                num_return_sequences=1,
+                                temperature=0.9, 
+                                do_sample=True)
+            preds = output.split('## OUTPUT')[1]
+            score = compute_score(preds, labels)
+            rewards.append(score)
+            
     return rewards
 
-def novelty_reward(completions, **kwargs):
+def novelty_rewards(completions, **kwargs):
     """
     Calculate the inverse value of the average semantic similarity between a single completion and hypothesis_bank (i.e., novelty score).
 
@@ -49,14 +94,19 @@ def novelty_reward(completions, **kwargs):
     - float, novelty score, range [0, 1], the larger the value, the more novel it is
     """
     contents = [completion[0]["content"] for completion in completions]
-    emb_completions = model.encode(contents, convert_to_tensor=True)
+    new_hypothesis_list = [get_hypothesis_pred(output) for output in contents]
+    emb_completions = emb_model.encode(hyps, convert_to_tensor=True)
 
     rewards = []
-    for emb_completion in emb_completions:
-        cosine_rewards = util.cos_sim(emb_completion, emb_hyp_bank)
-        mean_similarity = cosine_rewards.mean().item()
-        novelty = 1 - mean_similarity
-        rewards.append(novelty)
+    for hyp in new_hypothesis_list:
+        if not hyp:
+            rewards.append(0)
+        else:
+            emb_completion = emb_model.encode(hyp, convert_to_tensor=True)
+            cosine_rewards = util.cos_sim(emb_completion, emb_hyp_bank)
+            mean_similarity = cosine_rewards.mean().item()
+            novelty = 1 - mean_similarity
+            rewards.append(novelty)
 
     return rewards
 

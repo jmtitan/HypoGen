@@ -1,3 +1,20 @@
+To RUN:
+
+accelerate launch --num_processes=1 src/open_r1/grpo.py --config recipes/hypoGen/config_demo.yaml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Open R1
 
 *A fully open reproduction of DeepSeek-R1. This repo is a work in progress, let's build it together!*

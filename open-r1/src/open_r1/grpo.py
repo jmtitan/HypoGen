@@ -27,9 +27,11 @@ from transformers.trainer_utils import get_last_checkpoint
 
 from open_r1.configs import GRPOConfig
 #from open_r1.rewards import (
-from open_r1.tinyzero_rewards import (
+from open_r1.hypogen_rewards import (
+    novelty_rewards,
+    practical_rewards,
     #accuracy_reward,
-    evaluate_reward,
+    # evaluate_reward,
     code_reward,
     format_reward,
     get_code_format_reward,
@@ -171,7 +173,9 @@ def main(script_args, training_args, model_args):
     # Get reward functions
     REWARD_FUNCS_REGISTRY = {
         #"accuracy": accuracy_reward,
-        "eqn_eval": evaluate_reward,
+        "novelty" : novelty_rewards,
+        "practicality" : practical_rewards,
+        # "eqn_eval": evaluate_reward,
         "format": format_reward,
         "reasoning_steps": reasoning_steps_reward,
         "cosine": get_cosine_scaled_reward(
@@ -195,15 +199,17 @@ def main(script_args, training_args, model_args):
     # Format into conversation
     # Need to modify this to suit each dataset
     def make_conversation(example):
-        prompt = []
+        # prompt = []
 
-        if training_args.system_prompt is not None:
-            prompt.append({"role": "system", "content": training_args.system_prompt})
+        # if training_args.system_prompt is not None:
+        #     prompt.append({"role": "system", "content": training_args.system_prompt})
 
-        #prompt.append({"role": "user", "content": example["problem"]})
-        prompt.append({"role": "user", "content": f"Using the numbers {example['nums']}, create an equation that equals {example['target']}. You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags, for example <answer> (1 + 2) / 3 </answer>."
-                       })
-        return {"prompt": prompt}
+        # #prompt.append({"role": "user", "content": example["problem"]})
+        # prompt.append({"role": "user", "content": f"Using the numbers {example['nums']}, create an equation that equals {example['target']}. You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags, for example <answer> (1 + 2) / 3 </answer>."
+        #                })
+        return {"prompt": training_args.system_prompt}
+
+
 
     dataset = dataset.map(make_conversation)
 

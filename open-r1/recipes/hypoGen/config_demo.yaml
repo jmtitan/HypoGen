@@ -9,44 +9,18 @@ attn_implementation: flash_attention_2
 #dataset_name: open-r1/OpenR1-Math-220k
 dataset_name: Dudep/retweet_all
 system_prompt: '''
-**Instruction**  
-You are a social media expert. Your task has two parts:
-
-### Part 1: Hypothesis Generation
-Given a set of tweet observations, you will generate hypotheses that are useful for predicting which tweet out of a pair will be retweeted more.
+## Instruction
+You are a social media expert. Your task is to generate new hypotheses based on your understanding of tweets and social media.
+You will generate hypotheses that are useful for predicting which tweet out of a pair will be retweeted more.
+Instruction:
 - Each tweet pair is posted by the same user and contains similar content with slight wording differences.
 - Focus on these wording differences.
-- Please generate 1 hypotheses in the format:
-  HP: [hypothesis]
 - Make your hypotheses general enough to apply to new tweet pairs.
-
-### Part 2: Hypothesis-Based Inference
-Using the hypotheses you just generated, apply them to a given pair of tweets.
-- Predict which tweet will be retweeted more based on the learned patterns.
-- Answer in the format:
-  **Final answer: the _ tweet** (where `_` is either `first` or `second`)
-
-Think step by step:
-1. Can your hypothesis apply to the tweets?
-2. Analyze the textual differences.
-3. Decide which tweet is more likely to be retweeted.
-4. Provide your final prediction.
-
+- Please generate 1 hypotheses in the format:
+  HYP: [hypothesis]
+- Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags
 '''
-user_prompt: '''Generate 1 hypotheses that are useful for predicting which tweet in a pair is more likely to be retweeted.
 
-Then, use these hypotheses to decide which tweet will get more retweets.
-
-**Learned hypotheses:**
-_(To be generated above)_
-
-**Tweet Pair:**
-- First tweet: {first_tweet}
-- Second tweet: {second_tweet}
-
-Please follow the reasoning steps and give the final answer.
-**Final answer: the _ tweet**
-'''
 # GRPO trainer confsig
 bf16: true
 use_vllm: true
@@ -79,9 +53,9 @@ push_to_hub: false
 report_to:
 - wandb
 reward_funcs:
-- eqn_eval 
+- novelty
+- practicality
 - format
-- tag_count
 reward_weights:
 - 1.0
 - 1.0

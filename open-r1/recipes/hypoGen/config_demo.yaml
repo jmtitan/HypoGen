@@ -12,13 +12,6 @@ system_prompt: '''
 ## Instruction
 You are a social media expert. Your task is to generate new hypotheses based on your understanding of tweets and social media.
 You will generate hypotheses that are useful for predicting which tweet out of a pair will be retweeted more.
-Instruction:
-- Each tweet pair is posted by the same user and contains similar content with slight wording differences.
-- Focus on these wording differences.
-- Make your hypotheses general enough to apply to new tweet pairs.
-- Please generate 1 hypotheses in the format:
-  HYP: [hypothesis]
-- Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags
 '''
 
 # GRPO trainer confsig
@@ -40,8 +33,8 @@ logging_first_step: true
 logging_steps: 1
 logging_strategy: steps
 lr_scheduler_type: cosine
-max_prompt_length: 512
-max_completion_length: 1024
+max_prompt_length: 128
+max_completion_length: 256
 max_steps: -1
 num_generations: 4
 num_train_epochs: 1
@@ -55,7 +48,7 @@ report_to:
 reward_funcs:
 - novelty
 - practicality
-- format
+- tag_count
 reward_weights:
 - 1.0
 - 1.0

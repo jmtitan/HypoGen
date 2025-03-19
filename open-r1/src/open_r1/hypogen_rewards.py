@@ -3,6 +3,7 @@
 import json
 import math
 import re
+import ast
 from typing import Dict
 from latex2sympy2_extended import NormalizationConfig
 from math_verify import LatexExtractionConfig, parse, verify
@@ -15,8 +16,6 @@ from sentence_transformers import SentenceTransformer, util
 # load tool models
 emb_model = SentenceTransformer('all-MiniLM-L6-v2')
 infer_model = pipeline("text-generation", model="Qwen/Qwen2.5-3B-Instruct")
-with open('recipes/hypoGen/hypothesis_infer.md', 'r') as f:
-    infer_prompt = f.read()
 
 
 
@@ -34,7 +33,7 @@ tweet_pairs_dataset['input'] = [(first, second) for first, second in zip(tweet_p
 
 
 def get_hypothesis_pred(output):
-    match = re.search(r"Final answer: the (first|second) tweet", text)
+    match = re.search(r"Final answer: the (first|second) tweet", output)
     if match:
         result = match.group(1)
         return result
@@ -42,9 +41,10 @@ def get_hypothesis_pred(output):
         return None
 
 def get_hypothesis(output):
-    match = re.search(r'HYP:\s*(.*?[\.\!\?])', text)
+    match = re.search(r'HYP:\s*(.*?[\.\!\?])', output)
     if match:
         result = match.group(1)
+        return result
     else:
         return None
 
@@ -62,22 +62,27 @@ def practical_rewards(completions, **kwargs):
     llm_input = [tweet_pairs_dataset['input'][i] for i in indices]
     labels = [tweet_pairs_dataset['label'][i] for i in indices]
 
-    infer_template = infer_template.format(input=llm_input)
+    with open('recipes/hypoGen/hypothesis_infer.md', 'r') as f:
+        infer_template = f.read()
 
   
     rewards = []
-    for hyp, la in zip(new_hypothesis_list, label):
+    for hyp, la in zip(new_hypothesis_list, labels):
         if not hyp:
             rewards.append(0)
 
         else:
-            infer_template.format(hypothesis=hyp)
-            output = infer_model(infer_template, 
+            final_prompt = infer_template.format(input=llm_input, hypothesis=hyp)
+            output = infer_model(final_prompt, 
                                 max_new_tokens=100, 
                                 num_return_sequences=1,
                                 temperature=0.9, 
                                 do_sample=True)
-            preds = output.split('## OUTPUT')[1]
+            output = output[0]['generated_text'].split('## OUTPUT')[-1]
+            # TODO: check preds format
+            match = re.search(r'\[[^\[\]]*\]', output)
+            preds = match.group(0)
+            preds = ast.literal_eval(preds)
             score = compute_score(preds, labels)
             rewards.append(score)
             
@@ -94,8 +99,7 @@ def novelty_rewards(completions, **kwargs):
     - float, novelty score, range [0, 1], the larger the value, the more novel it is
     """
     contents = [completion[0]["content"] for completion in completions]
-    new_hypothesis_list = [get_hypothesis_pred(output) for output in contents]
-    emb_completions = emb_model.encode(hyps, convert_to_tensor=True)
+    new_hypothesis_list = [get_hypothesis(output) for output in contents]
 
     rewards = []
     for hyp in new_hypothesis_list:

@@ -6,7 +6,7 @@ import math
 import re
 import ast
 from functools import partial, update_wrapper
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 
 import numpy as np
 from latex2sympy2_extended import NormalizationConfig
@@ -85,6 +85,7 @@ def practical_rewards(completions, **kwargs):
                                 do_sample=True)
             output = output[0]['generated_text'].split('## OUTPUT')[-1]
             # TODO: check preds format
+            print('labels: ', la, " output: ", output)
             match = re.search(r'\[[^\[\]]*\]', output)
             preds = match.group(0)
             preds = ast.literal_eval(preds)
@@ -121,38 +122,40 @@ def novelty_rewards(completions, **kwargs):
 
 def soundness_reward(completions, **kwargs):
     contents = [completion[0]["content"] for completion in completions]
-    print("contents: ", contents)
+    #print("contents: ", contents)
     new_hypothesis_list = [get_hypothesis(output) for output in contents]
-    print("extract new hypothesis: ", new_hypothesis_list)
+    #print("extract new hypothesis: ", new_hypothesis_list)
+
+    filtered_hyp_list = [element for element in new_hypothesis_list if element is not None]
 
     prompt = "You are a social media expert specialized in judging the soundness of hypotheses for predicting tweet popularity. " + \
         "Given a list of hypotheses, please evaluate each hypothesis based on its soundness and provide a score from 0 to 1, " + \
         "where 0 means the hypothesis does not make sense at all, and 1 means the hypothesis is very sound and logical.\n" + \
         "Example output: [0.67, 0.42, 0.75, ...]\n" + \
         "## INPUT:\n" + \
-        f"List of hypotheses: {new_hypothesis_list}\n" + \
+        f"List of hypotheses: {filtered_hyp_list}\n" + \
         "## OUTPUT:"
 
+    output = infer_model(prompt, 
+                        max_new_tokens=100, 
+                        num_return_sequences=1,
+                        temperature=0.3, 
+                        do_sample=True)
+    output = output[0]['generated_text'].split('## OUTPUT')[-1]
+    print("Filtered hyp: ", filtered_hyp_list, "Soundness: ", output)
+    # TODO: check preds format
+    match = re.search(r'\[[^\[\]]*\]', output)
+    preds_score = match.group(0)
+    preds_score = ast.literal_eval(preds_score)
+
     rewards = []
-    print("prompt: ", prompt)
+    extract_hyp_idx=0
     for hyp in new_hypothesis_list:
         if not hyp:
             rewards.append(0)
         else:
-            output = infer_model(prompt, 
-                                max_new_tokens=100, 
-                                num_return_sequences=1,
-                                temperature=0.3, 
-                                do_sample=True)
-            print("output: ", output)
-            output = output[0]['generated_text'].split('## OUTPUT')[-1]
-            print("after output: ", output)
-            # TODO: check preds format
-            match = re.search(r'\[[^\[\]]*\]', output)
-            preds = match.group(0)
-            preds = ast.literal_eval(preds)
-            score = np.mean(preds)
-            rewards.append(score)
+            rewards.append(preds_score[extract_hyp_idx])
+            extract_hyp_idx += 1
             
     return rewards
 

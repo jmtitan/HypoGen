@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import random
 import logging
 import os
 import sys
@@ -47,7 +47,7 @@ from open_r1.utils.callbacks import get_callbacks
 from open_r1.utils.wandb_logging import init_wandb_training
 from trl import GRPOTrainer, ModelConfig, ScriptArguments, TrlParser, get_peft_config
 
-from open_r1.hypogen_rewards import get_reward_funcs, hypothesis_bank
+from open_r1.hypogen_rewards import hypothesis_bank
 
 logger = logging.getLogger(__name__)
 

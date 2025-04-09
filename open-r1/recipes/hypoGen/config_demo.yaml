@@ -16,36 +16,36 @@ You will generate hypotheses that are useful for predicting which tweet out of a
 ####################################################################################################
 # Add a switch generation_mode for hypothesis generation
 # 'zero_shot', 'few_shot', 'tweet_based'
-generation_mode: 'tweet_based'
+generation_mode: 'few_shot'
 
 user_prompt_zero_shot: '''Instruction:
 - Each tweet pair is posted by the same user and contains similar content with slight wording differences.
 - Focus on these wording differences.
 - Make your hypotheses general enough to apply to new tweet pairs.
 - Please generate 1 hypotheses in the format:
-HYP: [hypothesis]
+    HYP: [hypothesis]
 - Show your work in <think>\n...\n</think>\n<answer>\n...\n</answer> tags'''
 
 user_prompt_few_shot: '''Instruction:
 - Each tweet pair is posted by the same user and contains similar content with slight wording differences.
 - Focus on these wording differences.
 - Make your hypotheses general enough to apply to new tweet pairs.
-- Please generate 1 hypotheses in the format:
-HYP: [hypothesis]
-- Show your work in <think>\n...\n</think>\n<answer>\n...\n</answer> tags.
 - The following are some good example hypotheses. Try to follow their format but generate ideas different from theirs.
-{few_shot_examples}'''
+    {few_shot_examples}
+- Please generate 1 hypotheses in the format:
+    HYP: [hypothesis]
+- Show your work in <think>\n...\n</think>\n<answer>\n...\n</answer> tags.
+'''
 
 user_prompt_tweet_based: '''Instruction:
 - You will be shown a batch of tweet pairs. Each pair includes two tweets and a label indicating which tweet is retweeted more.
 - Below is a batch of tweet pairs:
-{tweet_examples}
+    {tweet_examples}
 - Make a hypothesis that explains why the labelled tweet is retweeted more than the unlabelled tweet in each pair. Make your hypothesis general enough so that they can also apply to new tweet pairs as well.
 - Please generate 1 hypotheses in the format:
-HYP: [hypothesis]
+    HYP: [hypothesis]
 - Show your work in <think>\n...\n</think>\n<answer>\n...\n</answer> tags.
-- The following are some good example hypotheses. Try to follow their format but generate ideas different from theirs.
-{few_shot_examples}'''
+'''
 ####################################################################################################
 
 # GRPO trainer confsig

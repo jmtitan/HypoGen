@@ -50,7 +50,24 @@ class GRPOConfig(trl.GRPOConfig):
         default=None,
         metadata={"help": ("The project to store runs under.")},
     )
-
+    #####################################################################################
+    generation_mode: str = field(
+        default='zero_shot',
+        metadata={"help": "The generation mode to use, including zero_shot, few_shot or tweet_based."},
+    )
+    user_prompt_zero_shot: Optional[str] = field(
+        default=None,
+        metadata={"help": "The optional system prompt to use for zero-shot generation."},
+    )
+    user_prompt_few_shot: Optional[str] = field(
+        default=None,
+        metadata={"help": "The optional system prompt to use for few-shot generation."},
+    )
+    user_prompt_tweet_based: Optional[str] = field(
+        default=None,
+        metadata={"help": "The optional system prompt to use for tweet-based generation."},
+    )
+    #####################################################################################
 
 @dataclass
 class SFTConfig(trl.SFTConfig):

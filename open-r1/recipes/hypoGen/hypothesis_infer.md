@@ -17,8 +17,8 @@ You will be given a learned pattern and a list of tweet pairs. For each tweet pa
 
 Step 1: Evaluate whether the learned pattern can be applied to the pair.
 Step 2: Analyze the textual differences between the two tweets.
-Step 3: Based on your pattern and the differences, reason which tweet is more likely to get more retweets.
-Step 4: Output your predictions in a Python list format. Each element should be either "first" or "second", corresponding to your decision for that pair.
+Step 3: Based on your pattern and the differences, reason which tweet is more likely to get more retweets and give "first" or "second" as final answer. 
+Step 4: Output your predictions in a Python list format. Each element should be either "first" or "second" corresponding to your decision for that pair, noted the responce shoud be in string format.
 
 Only return the list of predictions. No explanation is needed in the output.
 

@@ -7,6 +7,7 @@ import re
 import ast
 from functools import partial, update_wrapper
 from typing import Callable, Dict, List
+import warnings
 
 import numpy as np
 from latex2sympy2_extended import NormalizationConfig
@@ -31,10 +32,17 @@ hypothesis_bank = hb['hypothesis']
 emb_hyp_bank = emb_model.encode(hypothesis_bank, convert_to_tensor=True)
 
 # load dataset
-with open('../data/retweet/retweet_ood.json', 'r') as f:
+with open('../data/retweet/retweet_val.json', 'r') as f:
     tweet_pairs_dataset = json.load(f)
 tweet_pairs_dataset['input'] = [(first, second) for first, second in zip(tweet_pairs_dataset['first_tweet'], tweet_pairs_dataset['second_tweet'])]
 
+import numpy as np
+
+def avg(inp: list):
+    return sum(inp) / len(inp)
+
+def reward_cos_map(r):
+    return 0.5 * (1 - np.cos(np.pi * (r - 0.4) / 0.3))
 
 
 def get_hypothesis_pred(output):
@@ -61,36 +69,45 @@ def compute_score(preds, labels):
 def practical_rewards(completions, **kwargs):
     contents = [completion[0]["content"] for completion in completions]
     new_hypothesis_list = [get_hypothesis(output) for output in contents]
-
-    # random sample
-    indices = random.sample(range(len(tweet_pairs_dataset['input'])), 10)
-    llm_input = [tweet_pairs_dataset['input'][i] for i in indices]
-    labels = [tweet_pairs_dataset['label'][i] for i in indices]
+    batch_size = 10
+    ## random sample
+    #indices = random.sample(range(len(tweet_pairs_dataset['input'])), 10)
+    #llm_input = [tweet_pairs_dataset['input'][i] for i in indices]
+    #labels = [tweet_pairs_dataset['label'][i] for i in indices]
 
     with open('recipes/hypoGen/hypothesis_infer.md', 'r') as f:
         infer_template = f.read()
 
   
     rewards = []
-    for hyp, la in zip(new_hypothesis_list, labels):
+    for hyp in new_hypothesis_list:
         if not hyp:
             rewards.append(0)
 
         else:
-            final_prompt = infer_template.format(input=llm_input, hypothesis=hyp)
-            output = infer_model(final_prompt, 
-                                max_new_tokens=100, 
-                                num_return_sequences=1,
-                                temperature=0.9, 
-                                do_sample=True)
-            output = output[0]['generated_text'].split('## OUTPUT')[-1]
-            # TODO: check preds format
-            print('labels: ', la, " output: ", output)
-            match = re.search(r'\[[^\[\]]*\]', output)
-            preds = match.group(0)
-            preds = ast.literal_eval(preds)
-            score = compute_score(preds, labels)
-            rewards.append(score)
+            tmp_scores = []
+            # for i in range(0, len(tweet_pairs_dataset['input']), batch_size):
+            for i in range(0, 50, batch_size): 
+                llm_input = tweet_pairs_dataset['input'][i:i+batch_size]
+                labels = tweet_pairs_dataset['label'][i:i+batch_size]
+                final_prompt = infer_template.format(input=llm_input, hypothesis=hyp)
+                output = infer_model(final_prompt, 
+                                    max_new_tokens=100, 
+                                    num_return_sequences=1,
+                                    temperature=0.2, 
+                                    do_sample=True)
+                # if hyp is not enough to infer the right answer, give "NONE" as final answer
+                output = output[0]['generated_text'].split('## OUTPUT')[-1]
+                match = re.search(r'\[[^\[\]]*\]', output)
+                if match:
+                    preds = match.group(0)
+                    # print(preds)
+                    preds = ast.literal_eval(preds)
+                    score = compute_score(preds, labels)
+                    tmp_scores.append(reward_cos_map(score))
+                else:
+                    tmp_scores.append(0)
+            rewards.append(avg(tmp_scores))
             
     return rewards
 
@@ -126,36 +143,56 @@ def soundness_reward(completions, **kwargs):
     new_hypothesis_list = [get_hypothesis(output) for output in contents]
     #print("extract new hypothesis: ", new_hypothesis_list)
 
-    filtered_hyp_list = [element for element in new_hypothesis_list if element is not None]
+    #filtered_hyp_list = [element for element in new_hypothesis_list if element is not None]
 
-    prompt = "You are a social media expert specialized in judging the soundness of hypotheses for predicting tweet popularity. " + \
-        "Given a list of hypotheses, please evaluate each hypothesis based on its soundness and provide a score from 0 to 1, " + \
-        "where 0 means the hypothesis does not make sense at all, and 1 means the hypothesis is very sound and logical.\n" + \
-        "Example output: [0.67, 0.42, 0.75, ...]\n" + \
-        "## INPUT:\n" + \
-        f"List of hypotheses: {filtered_hyp_list}\n" + \
-        "## OUTPUT:"
+    #prompt = "You are a social media expert specialized in judging the soundness of hypotheses for predicting tweet popularity. " + \
+        #"Given a list of hypotheses, please evaluate each hypothesis based on its soundness and provide a score from 0 to 1, " + \
+        #"where 0 means the hypothesis does not make sense at all, and 1 means the hypothesis is very sound and logical.\n" + \
+        #"Example output: [0.67, 0.42, 0.75, ...]\n" + \
+        #"## INPUT:\n" + \
+        #f"List of hypotheses: {filtered_hyp_list}\n" + \
+        #"## OUTPUT:"
 
-    output = infer_model(prompt, 
-                        max_new_tokens=100, 
-                        num_return_sequences=1,
-                        temperature=0.3, 
-                        do_sample=True)
-    output = output[0]['generated_text'].split('## OUTPUT')[-1]
-    print("Filtered hyp: ", filtered_hyp_list, "Soundness: ", output)
-    # TODO: check preds format
-    match = re.search(r'\[[^\[\]]*\]', output)
-    preds_score = match.group(0)
-    preds_score = ast.literal_eval(preds_score)
+    with open('recipes/hypoGen/judge_model.md', 'r') as f:
+        infer_template = f.read()
 
     rewards = []
-    extract_hyp_idx=0
     for hyp in new_hypothesis_list:
         if not hyp:
             rewards.append(0)
         else:
-            rewards.append(preds_score[extract_hyp_idx])
-            extract_hyp_idx += 1
+            max_retries = 3
+            retry_count = 0
+            output = infer_model(infer_template.format(hypothesis = hyp), #prompt, 
+                                max_new_tokens=100, 
+                                num_return_sequences=1,
+                                temperature=0.3, 
+                                do_sample=True)
+            output = output[0]['generated_text'].split('## OUTPUT')[-1]
+    
+            # Extract scores with error handling
+            #match = re.search(r'\[[^\[\]]*\]', output)
+            match = re.search(r'Score:\s*([0-9]+(?:\.[0-9]+)?)', output)
+            if not match:
+                while retry_count < max_retries:
+                    warnings.warn(f"No valid score list found in LLM output. Remaining retries: {max_retries - retry_count}", UserWarning)
+                    retry_count += 1
+                    output = infer_model(infer_template.format(hypothesis = hyp), #prompt,
+                                        max_new_tokens=100, 
+                                        num_return_sequences=1,
+                                        temperature=0.3, 
+                                        do_sample=True)
+                    output = output[0]['generated_text'].split('## OUTPUT')[-1]
+                    match = re.search(r'\[[^\[\]]*\]', output)
+                    if match:
+                        break
+            
+            if not match:
+                rewards.append(0)
+            else: 
+                rewards.append(0.1*float(match.group(1))) # to [0, 1]
+            
+    rewards = [max(0.0, min(1.0, score)) for score in rewards]
             
     return rewards
 

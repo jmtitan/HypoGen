@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
 import logging
 import os
 import sys
@@ -34,6 +35,7 @@ from open_r1.utils.callbacks import get_callbacks
 from open_r1.utils.wandb_logging import init_wandb_training
 from trl import GRPOTrainer, ModelConfig, TrlParser, get_peft_config
 
+from open_r1.hypogen_rewards import hypothesis_bank
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,11 @@ def main(script_args, training_args, model_args):
     # Get reward functions from the registry
     reward_funcs = get_reward_funcs(script_args)
 
+    # Randomly sample k examples from the dataset for few-shot generation, used for prompting
+    def get_random_batch(dataset, k=10):
+        sample = random.sample(list(dataset), k)
+        return [(s['first_tweet'], s['second_tweet'], s['result']) for s in sample]
+
     # Format into conversation
     # Need to modify this to suit each dataset
     def make_conversation(example):
@@ -96,6 +103,7 @@ def main(script_args, training_args, model_args):
             prompt.append({"role": "system", "content": training_args.system_prompt})
 
         # #prompt.append({"role": "user", "content": example["problem"]})
+        """
         prompt.append({"role": "user", "content": '''Instruction:
             - Each tweet pair is posted by the same user and contains similar content with slight wording differences.
             - Focus on these wording differences.
@@ -103,6 +111,42 @@ def main(script_args, training_args, model_args):
             - Please generate 1 hypotheses in the format:
             HYP: [hypothesis]
             - Show your work in <think>\n...\n</think>\n<answer>\n...\n</answer> tags'''})
+        """
+        if training_args.generation_mode == "zero_shot" and training_args.user_prompt_zero_shot is not None:
+            prompt.append({"role": "user", "content": training_args.user_prompt_zero_shot})
+
+
+        elif training_args.generation_mode == "few_shot" and training_args.user_prompt_few_shot is not None:
+            # Get a random batch of 4 example hypotheses from the hypothesis bank
+            few_shot = random.sample(hypothesis_bank, 4)
+            # Remove the index of the hypotheses
+            few_shot = [h.split(". ", 1)[1] for h in few_shot]
+            # Format them into a single string
+            few_shot_text = "\n".join([f"- HYP: {h}" for h in few_shot])
+            # Add the examples to the prompt
+            user_prompt = training_args.user_prompt_few_shot.format(few_shot_examples=few_shot_text)
+            prompt.append({"role": "user", "content": user_prompt})
+
+
+        elif training_args.generation_mode == "tweet_based" and training_args.user_prompt_tweet_based is not None:
+            # Get a random batch of 10 tweet pairs from the dataset
+            tweet_examples = get_random_batch(dataset['train'], k=10)
+            # Format them into a single string
+            tweet_examples_text = "\n".join([f"- tweet 1: {t[0]}\n- tweet 2: {t[1]}\n- label: {t[2]}" for t in tweet_examples])
+
+            # Get a random batch of 4 example hypotheses from the hypothesis bank
+            few_shot = random.sample(hypothesis_bank, 4)
+            # Remove the index of the hypotheses
+            few_shot = [h.split(". ", 1)[1] for h in few_shot]
+            # Format them into a single string
+            few_shot_text = "\n".join([f"- HYP: {h}" for h in few_shot])
+
+            # Add the examples to the prompt
+            user_prompt = training_args.user_prompt_tweet_based.format(
+                few_shot_examples=few_shot_text,
+                tweet_examples=tweet_examples_text
+            )
+            prompt.append({"role": "user", "content": user_prompt})
         return {"prompt": prompt}
 
 

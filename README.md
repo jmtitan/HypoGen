@@ -10,7 +10,6 @@ Replace open-r1/src/grpo_trainer.py in trl package to enable RND training.
 
 accelerate launch --config_file recipes/accelerate_configs/zero2.yaml src/open_r1/grpo.py --config recipes/hypoGen/config_demo.yaml
 
-nohup accelerate launch --config_file recipes/accelerate_configs/zero2.yaml src/open_r1/grpo.py --config recipes/hypoGen/config_demo.yaml > train.log 2>&1 &
 
 ## Our work
 

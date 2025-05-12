@@ -22,7 +22,7 @@ nohup accelerate launch --config_file recipes/accelerate_configs/zero2.yaml src/
  -  We successfully implement and demonstrate our approach within a GRPO-based training framework, providing empirical evidence for improved novelty without compromising soundness.
 
 
-
+```
 @misc{openr1,
     title = {Open R1: A fully open reproduction of DeepSeek-R1},
     url = {https://github.com/huggingface/open-r1},
@@ -30,3 +30,4 @@ nohup accelerate launch --config_file recipes/accelerate_configs/zero2.yaml src/
     month = {January},
     year = {2025}
 }
+```

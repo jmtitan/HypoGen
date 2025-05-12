@@ -22,13 +22,6 @@ nohup accelerate launch --config_file recipes/accelerate_configs/zero2.yaml src/
 
  -  We successfully implement and demonstrate our approach within a GRPO-based training framework, providing empirical evidence for improved novelty without compromising soundness.
 
-## Citation
-```
-@misc{openr1,
-    title = {Open R1: A fully open reproduction of DeepSeek-R1},
-    url = {https://github.com/huggingface/open-r1},
-    author = {Hugging Face},
-    month = {January},
-    year = {2025}
-}
-```
+## Acknowledge
+We run our experiments based on [open-r1](https://github.com/huggingface/open-r1).
+We use Qwen2.5 series base model [qwen2.5](https://github.com/QwenLM/Qwen3).

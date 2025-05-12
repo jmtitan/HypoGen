@@ -1,7 +1,8 @@
 # Improving creativity of LLM via pure Reinforcement Learning
 
 ## Before start
-Replace grpo_trainer.py in trl package to enable RND training.
+Follow installation step of Open-r1
+Replace open-r1/src/grpo_trainer.py in trl package to enable RND training.
 
 
 ## test run
@@ -22,3 +23,10 @@ nohup accelerate launch --config_file recipes/accelerate_configs/zero2.yaml src/
 
 
 
+@misc{openr1,
+    title = {Open R1: A fully open reproduction of DeepSeek-R1},
+    url = {https://github.com/huggingface/open-r1},
+    author = {Hugging Face},
+    month = {January},
+    year = {2025}
+}

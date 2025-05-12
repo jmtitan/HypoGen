@@ -1,4 +1,4 @@
-# hypo-G
+# Improving creativity of LLM via pure Reinforcement Learning
 
 ## Before start
 Replace grpo_trainer.py in trl package to enable RND training.
